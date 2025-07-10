@@ -42,7 +42,7 @@ hb_protocol = device.run_protocol(HeartbeatProtocol())
 # listeners
 vfr = device.add_listener(VFRHUD())
 global_pos = device.add_listener(GlobalPosition())
-heartbeat = device.add_listener(Heartbeat())
+heartbeat = device.add_listener(Heartbeat(heartbeat_cb))
 
 app = FastAPI()
 
@@ -58,15 +58,17 @@ app.add_middleware(
 @app.get("/telemetry")
 def get_telemetry():
     global msg_id, heartbeat_id, vfr, global_pos, heartbeat
+    msg_id += 1
     return {"msg_id": msg_id, 
-            "heading": global_pos.heading, 
+            "heading": vfr.heading_int * 1.0, 
             "airspeed": vfr.airspeed,
             "verticalSpeed": vfr.climbspeed,
             "horizontalSpeed": vfr.groundspeed,
-            "altitudeASL": global_pos.altitude_relative,
+            "altitudeASL": global_pos.alt_relative / 1000.0,
             "heartbeatID": heartbeat_id,
             "heartbeatHZ": calculate_hz(),
-            "throttle": vfr.throttle}
+            "throttle": vfr.throttle * 1.0
+            }
 
 @app.get("/")
 def root():
