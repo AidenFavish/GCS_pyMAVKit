@@ -68,6 +68,21 @@ def get_telemetry():
             "heartbeatID": heartbeat_id,
             "heartbeatHZ": calculate_hz(),
             "throttle": vfr.throttle,
+            "voltages": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+            "voltage": 0.0,
+            "current": 0.0,
+            "power": 0.0,
+            "soc": 0.0,
+            "time_left": "00:00",
+            "wh_left": 0.0,
+            "sats": -1,
+            "gps_fix": -1,
+            "armed": False,
+            "estop": False,
+            "mode": "UNKNOWN",
+            "msg": "",
+            "lat": 0.0,
+            "lon": 0.0
             }
 
 @app.get("/")
