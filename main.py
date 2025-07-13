@@ -42,7 +42,7 @@ hb_protocol = device.run_protocol(HeartbeatProtocol())
 # listeners
 vfr = device.add_listener(VFRHUD())
 global_pos = device.add_listener(GlobalPosition())
-heartbeat = device.add_listener(Heartbeat())
+heartbeat = device.add_listener(Heartbeat(heartbeat_cb))
 batt = device.add_listener(BatteryStatus())
 
 app = FastAPI()
@@ -68,7 +68,7 @@ def get_telemetry():
             "heartbeatID": heartbeat_id,
             "heartbeatHZ": calculate_hz(),
             "throttle": vfr.throttle,
-            "voltages": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+            "voltages": [0.5, 0.0, 0.0, 0.0, 0.0, 0.0],
             "voltage": 0.0,
             "current": 0.0,
             "power": 0.0,
