@@ -2,7 +2,7 @@ from fastapi import FastAPI
 import time
 from fastapi.middleware.cors import CORSMiddleware
 from pymavkit import MAVDevice
-from pymavkit.messages import VFRHUD, GlobalPosition, Heartbeat, BatteryStatus
+from pymavkit.messages import VFRHUD, GlobalPosition, Heartbeat, BatteryStatus, GPSRaw, MAVState
 from pymavkit.protocols import HeartbeatProtocol
 
 BUFFER_SIZE = 4
@@ -44,6 +44,7 @@ vfr = device.add_listener(VFRHUD())
 global_pos = device.add_listener(GlobalPosition())
 heartbeat = device.add_listener(Heartbeat(heartbeat_cb))
 batt = device.add_listener(BatteryStatus())
+gps = device.add_listener(GPSRaw())
 
 app = FastAPI()
 
@@ -58,7 +59,8 @@ app.add_middleware(
 
 @app.get("/telemetry")
 def get_telemetry():
-    global msg_id, heartbeat_id, vfr, global_pos, heartbeat, batt
+    global msg_id, heartbeat_id, vfr, global_pos, heartbeat, batt, gps
+    the_voltage = sum(batt.voltages[0:1]) / 1
     return {"msg_id": msg_id, 
             "heading": vfr.heading_int * 1.0, 
             "airspeed": vfr.airspeed,
@@ -68,21 +70,21 @@ def get_telemetry():
             "heartbeatID": heartbeat_id,
             "heartbeatHZ": calculate_hz(),
             "throttle": vfr.throttle,
-            "voltages": [0.5, 0.0, 0.0, 0.0, 0.0, 0.0],
-            "voltage": 0.0,
-            "current": 0.0,
-            "power": 0.0,
-            "soc": 0.0,
+            "voltages": [voltage / 12.5 for voltage in batt.voltages],
+            "voltage": the_voltage,
+            "current": batt.current,
+            "power": batt.current * the_voltage,
+            "soc": batt.soc,
             "time_left": "00:00",
-            "wh_left": 0.0,
-            "sats": -1,
-            "gps_fix": -1,
-            "armed": False,
-            "estop": False,
-            "mode": "UNKNOWN",
-            "msg": "",
-            "lat": 0.0,
-            "lon": 0.0
+            "wh_left": -1.0,
+            "sats": gps.sats,
+            "gps_fix": gps.fix_type.name,
+            "armed": heartbeat.isArmed(),
+            "estop": (heartbeat.state == MAVState.EMERGENCY),
+            "mode": heartbeat.mode.name,
+            "msg": str(msg_id),
+            "lat": global_pos.lat,
+            "lon": global_pos.lon
             }
 
 @app.get("/")
