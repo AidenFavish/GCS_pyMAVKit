@@ -60,31 +60,31 @@ app.add_middleware(
 @app.get("/telemetry")
 def get_telemetry():
     global msg_id, heartbeat_id, vfr, global_pos, heartbeat, batt, gps
-    the_voltage = sum(batt.voltages[0:1]) / 1
+    the_voltage = sum(batt.voltages[0:1]) / 1.0 / 1000
     return {"msg_id": msg_id, 
             "heading": vfr.heading_int * 1.0, 
-            "airspeed": vfr.airspeed,
-            "verticalSpeed": vfr.climbspeed,
-            "horizontalSpeed": vfr.groundspeed,
-            "altitudeASL": global_pos.alt_relative / 1000.0,
+            "airspeed": vfr.airspeed * 2.2376,
+            "verticalSpeed": vfr.climbspeed * 2.2376,
+            "horizontalSpeed": vfr.groundspeed * 2.2376,
+            "altitudeASL": global_pos.alt_relative / 1000.0 * 3.281,
             "heartbeatID": heartbeat_id,
             "heartbeatHZ": calculate_hz(),
             "throttle": vfr.throttle,
-            "voltages": [voltage / 12.5 for voltage in batt.voltages],
-            "voltage": the_voltage,
-            "current": batt.current,
-            "power": batt.current * the_voltage,
-            "soc": batt.soc,
+            "voltages": [(voltage / 12500.0 if voltage / 12500.0 <= 1.1 else 0.0) for voltage in batt.voltages[0:6]],
+            "voltage": float(the_voltage),
+            "current": float(batt.current / 10.0),
+            "power": float(batt.current / 10.0 * the_voltage),
+            "soc": float(batt.soc),
             "time_left": "00:00",
             "wh_left": -1.0,
-            "sats": gps.sats,
+            "sats": int(gps.sats),
             "gps_fix": gps.fix_type.name,
             "armed": heartbeat.isArmed(),
-            "estop": (heartbeat.state == MAVState.EMERGENCY),
+            "estop": bool(heartbeat.state == MAVState.EMERGENCY),
             "mode": heartbeat.mode.name,
             "msg": str(msg_id),
-            "lat": global_pos.lat,
-            "lon": global_pos.lon
+            "lat": float(global_pos.lat / 10e6),
+            "lon": float(global_pos.lon / 10e6)
             }
 
 @app.get("/")
