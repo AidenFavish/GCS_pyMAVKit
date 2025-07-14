@@ -2,7 +2,7 @@ from fastapi import FastAPI
 import time
 from fastapi.middleware.cors import CORSMiddleware
 from pymavkit import MAVDevice
-from pymavkit.messages import VFRHUD, GlobalPosition, Heartbeat, BatteryStatus, GPSRaw, MAVState, Attitude
+from pymavkit.messages import VFRHUD, GlobalPosition, Heartbeat, BatteryStatus, GPSRaw, MAVState, Attitude, StatusText, MAVSeverity
 from pymavkit.protocols import HeartbeatProtocol
 
 BUFFER_SIZE = 4
@@ -32,6 +32,11 @@ def calculate_hz() -> float:
         return 1.0 / avg
     else:
         return -1.0
+    
+msg_buffer = ""
+def msg_cb(msg):
+    global msg_buffer
+    msg_buffer += msg.text + "\n"
 
 
 device = MAVDevice("udp:127.0.0.1:14550")
@@ -46,6 +51,7 @@ heartbeat = device.add_listener(Heartbeat(heartbeat_cb))
 batt = device.add_listener(BatteryStatus())
 gps = device.add_listener(GPSRaw())
 attitude = device.add_listener(Attitude())
+status_text = device.add_listener(StatusText("", MAVSeverity.INFO, msg_cb))
 
 app = FastAPI()
 
@@ -60,7 +66,9 @@ app.add_middleware(
 
 @app.get("/telemetry")
 def get_telemetry():
-    global msg_id, heartbeat_id, vfr, global_pos, heartbeat, batt, gps, attitude
+    global msg_id, heartbeat_id, vfr, global_pos, heartbeat, batt, gps, attitude, msg_buffer
+    msg_to_send = msg_buffer
+    msg_buffer = ""
     the_voltage = sum(batt.voltages[0:1]) / 1.0 / 1000
     return {"msg_id": msg_id, 
             "heading": vfr.heading_int * 1.0, 
@@ -83,7 +91,7 @@ def get_telemetry():
             "armed": heartbeat.isArmed(),
             "estop": bool(heartbeat.state == MAVState.EMERGENCY),
             "mode": heartbeat.mode.name,
-            "msg": str(msg_id),
+            "msg": msg_to_send,
             "lat": float(global_pos.lat / 10e6),
             "lon": float(global_pos.lon / 10e6),
             "roll": attitude.roll * 180.0 / 3.14,
