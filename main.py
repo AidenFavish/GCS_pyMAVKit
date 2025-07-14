@@ -2,7 +2,7 @@ from fastapi import FastAPI
 import time
 from fastapi.middleware.cors import CORSMiddleware
 from pymavkit import MAVDevice
-from pymavkit.messages import VFRHUD, GlobalPosition, Heartbeat, BatteryStatus, GPSRaw, MAVState
+from pymavkit.messages import VFRHUD, GlobalPosition, Heartbeat, BatteryStatus, GPSRaw, MAVState, Attitude
 from pymavkit.protocols import HeartbeatProtocol
 
 BUFFER_SIZE = 4
@@ -45,6 +45,7 @@ global_pos = device.add_listener(GlobalPosition())
 heartbeat = device.add_listener(Heartbeat(heartbeat_cb))
 batt = device.add_listener(BatteryStatus())
 gps = device.add_listener(GPSRaw())
+attitude = device.add_listener(Attitude())
 
 app = FastAPI()
 
@@ -59,7 +60,7 @@ app.add_middleware(
 
 @app.get("/telemetry")
 def get_telemetry():
-    global msg_id, heartbeat_id, vfr, global_pos, heartbeat, batt, gps
+    global msg_id, heartbeat_id, vfr, global_pos, heartbeat, batt, gps, attitude
     the_voltage = sum(batt.voltages[0:1]) / 1.0 / 1000
     return {"msg_id": msg_id, 
             "heading": vfr.heading_int * 1.0, 
@@ -84,7 +85,9 @@ def get_telemetry():
             "mode": heartbeat.mode.name,
             "msg": str(msg_id),
             "lat": float(global_pos.lat / 10e6),
-            "lon": float(global_pos.lon / 10e6)
+            "lon": float(global_pos.lon / 10e6),
+            "roll": attitude.roll * 180.0 / 3.14,
+            "pitch": attitude.pitch * 180.0 / 3.14
             }
 
 @app.get("/")
