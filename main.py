@@ -118,26 +118,26 @@ def get_state() -> dict:
 def root():
     return {"message": "wassup"}
 
-async def broadcast() -> None:
-        if not websocket_connections:
-            return
-        payload = get_state()
-        # Send to all; drop dead sockets
-        dead: list[WebSocket] = []
-        for ws in websocket_connections:
-            try:
-                await ws.send_json(payload)
-            except WebSocketDisconnect:
-                dead.append(ws)
-            except Exception:
-                dead.append(ws)
-        for ws in dead:
-            websocket_connections.remove(ws)
+# async def broadcast() -> None:
+#         if not websocket_connections:
+#             return
+#         payload = get_state()
+#         # Send to all; drop dead sockets
+#         dead: list[WebSocket] = []
+#         for ws in websocket_connections:
+#             try:
+#                 await ws.send_json(payload)
+#             except WebSocketDisconnect:
+#                 dead.append(ws)
+#             except Exception:
+#                 dead.append(ws)
+#         for ws in dead:
+#             websocket_connections.remove(ws)
 
 
-async def main_loop():
-    while True:
-        await broadcast()
-        await asyncio.sleep(1.0)
+# async def main_loop():
+#     while True:
+#         await broadcast()
+#         await asyncio.sleep(1.0)
 
-asyncio.run(main_loop())
+# asyncio.run(main_loop())
