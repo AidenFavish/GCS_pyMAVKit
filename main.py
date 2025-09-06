@@ -140,4 +140,23 @@ async def main_loop():
         await broadcast()
         await asyncio.sleep(1.0)
 
-asyncio.run(main_loop())
+loop_task: asyncio.Task | None = None
+
+
+@app.on_event("startup")
+async def start_background_tasks():
+    global loop_task
+    # Run the broadcast loop inside FastAPI/Uvicorn's event loop
+    loop_task = asyncio.create_task(main_loop())
+
+
+@app.on_event("shutdown")
+async def stop_background_tasks():
+    global loop_task
+    if loop_task is not None:
+        loop_task.cancel()
+        try:
+            await loop_task
+        except asyncio.CancelledError:
+            pass
+        loop_task = None
