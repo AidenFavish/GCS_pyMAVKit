@@ -1,11 +1,13 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 import time
 from fastapi.middleware.cors import CORSMiddleware
 from pymavkit import MAVDevice
 from pymavkit.messages import VFRHUD, GlobalPosition, Heartbeat, BatteryStatus, GPSRaw, MAVState, Attitude, StatusText, MAVSeverity
 from pymavkit.protocols import HeartbeatProtocol
+from pydantic import BaseModel
+import asyncio
 
-BUFFER_SIZE = 4
+BUFFER_SIZE = 5
 heartbeat_timestamps = []
 msg_id = 0
 heartbeat_id = 0
@@ -37,6 +39,11 @@ msg_buffer = ""
 def msg_cb(msg):
     global msg_buffer
     msg_buffer += msg.text + "\n"
+
+class ModeBody(BaseModel):
+    mode: str
+
+websocket_connections: list[WebSocket] = []
 
 
 device = MAVDevice("udp:127.0.0.1:14550")
@@ -71,40 +78,66 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-@app.get("/telemetry")
-def get_telemetry():
+@app.get("/health")
+def health() -> dict:
+    return {"ok": True}
+
+
+@app.post("/api/mode")
+def set_mode(body: ModeBody) -> dict:
+    return {"ok": True, "mode": "RTL"}
+
+
+@app.websocket("/ws/telemetry")
+async def ws_telemetry(ws: WebSocket):
+    await ws.accept()
+    websocket_connections.append(ws)
+
+def get_state() -> dict:
     global msg_id, heartbeat_id, vfr, global_pos, heartbeat, batt, gps, attitude, msg_buffer
     msg_to_send = msg_buffer
     msg_buffer = ""
-    the_voltage = sum(batt.voltages[0:1]) / 1.0 / 1000
-    return {"msg_id": msg_id, 
-            "heading": vfr.heading_int * 1.0, 
-            "airspeed": vfr.airspeed * 2.2376,
-            "verticalSpeed": vfr.climbspeed * 2.2376,
-            "horizontalSpeed": vfr.groundspeed * 2.2376,
-            "altitudeASL": global_pos.alt_relative / 1000.0 * 3.281,
-            "heartbeatID": heartbeat_id,
-            "heartbeatHZ": calculate_hz(),
-            "throttle": vfr.throttle,
-            "voltages": [(voltage / 12500.0 if voltage / 12500.0 <= 1.1 else 0.0) for voltage in batt.voltages[0:6]],
-            "voltage": float(the_voltage),
-            "current": float(batt.current / 10.0),
-            "power": float(batt.current / 10.0 * the_voltage),
-            "soc": float(batt.soc),
-            "time_left": "00:00",
-            "wh_left": -1.0,
-            "sats": int(gps.sats),
-            "gps_fix": gps.fix_type.name,
-            "armed": heartbeat.isArmed(),
-            "estop": bool(heartbeat.state == MAVState.EMERGENCY),
-            "mode": heartbeat.mode.name,
-            "msg": msg_to_send,
-            "lat": float(global_pos.lat / 10e6),
-            "lon": float(global_pos.lon / 10e6),
-            "roll": attitude.roll * 180.0 / 3.14,
-            "pitch": attitude.pitch * 180.0 / 3.14
+    return {'timestamp': time.time() * 1000.0,
+            'batterySoc': 92.0,
+            'armed': False,
+            'estopOn': True,
+            'mode': "RTL",
+            'currentLat': 37.7749,
+            'currentLon': -122.4194,
+            'heading': 45.0,
+            'altitude': 120.0,
+            'throttle': 30.0,
+            'speed': 12.0,
+            'roll': 5.0,
+            'pitch': -2.0,
+            'heartbeat': "1 hz",
+            'status': "Status #0",
             }
 
 @app.get("/")
 def root():
     return {"message": "wassup"}
+
+async def broadcast() -> None:
+        if not websocket_connections:
+            return
+        payload = get_state()
+        # Send to all; drop dead sockets
+        dead: list[WebSocket] = []
+        for ws in websocket_connections:
+            try:
+                await ws.send_json(payload)
+            except WebSocketDisconnect:
+                dead.append(ws)
+            except Exception:
+                dead.append(ws)
+        for ws in dead:
+            websocket_connections.remove(ws)
+
+
+async def main_loop():
+    while True:
+        await broadcast()
+        await asyncio.sleep(1.0)
+
+asyncio.run(main_loop())
