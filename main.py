@@ -2,8 +2,8 @@ from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 import time
 from fastapi.middleware.cors import CORSMiddleware
 from pymavkit import MAVDevice
-from pymavkit.messages import VFRHUD, GlobalPosition, Heartbeat, BatteryStatus, GPSRaw, MAVState, Attitude, StatusText, MAVSeverity
-from pymavkit.protocols import HeartbeatProtocol
+from pymavkit.messages import VFRHUD, GlobalPosition, Heartbeat, BatteryStatus, GPSRaw, MAVState, Attitude, StatusText, MAVSeverity, FlightMode, IntervalMessageID
+from pymavkit.protocols import HeartbeatProtocol, SetModeProtocol, RequestMessageProtocol
 from pydantic import BaseModel
 import asyncio
 import contextlib
@@ -102,7 +102,16 @@ def health() -> dict:
 
 @app.post("/api/mode")
 def set_mode(body: ModeBody) -> dict:
-    return {"ok": True, "mode": "RTL"}
+    global device
+    try:
+        mode = FlightMode[body.mode.upper()]
+    except:
+        mode = FlightMode.RTL
+    set_mode_protocol = SetModeProtocol(mode)
+    a = device.run_protocol(set_mode_protocol)
+    print(set_mode_protocol.ack_msg)
+
+    return {"ok": True, "mode": body.mode}
 
 
 @app.websocket("/ws/telemetry")
@@ -121,12 +130,12 @@ def get_state() -> dict:
             'mode': heartbeat.mode.name,
             'currentLat': global_pos.lat,
             'currentLon': global_pos.lon,
-            'heading': global_pos.heading,
+            'heading': vfr.heading_int,
             'altitude': global_pos.alt_relative,
             'throttle': vfr.throttle,
             'speed': (vfr.climbspeed**2+global_pos.vx**2+global_pos.vy**2)**0.5,
-            'roll': attitude.roll,
-            'pitch': attitude.pitch,
+            'roll': attitude.roll * 180.0 / 3.1415,
+            'pitch': attitude.pitch * 180.0 / 3.1415,
             'heartbeat': heartbeat_id,
             'hb_hz': f"{calculate_hz():.2f} hz",
             'status': msg_to_send,
