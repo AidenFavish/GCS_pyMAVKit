@@ -6,6 +6,7 @@ from pymavkit.messages import VFRHUD, GlobalPosition, Heartbeat, BatteryStatus, 
 from pymavkit.protocols import HeartbeatProtocol
 from pydantic import BaseModel
 import asyncio
+import contextlib
 
 BUFFER_SIZE = 5
 heartbeat_timestamps = []
@@ -67,7 +68,23 @@ device.add_listener(gps)
 device.add_listener(attitude)
 device.add_listener(status_text)
 
-app = FastAPI()
+# Manage background tasks using FastAPI lifespan (on_event deprecated)
+loop_task: asyncio.Task | None = None
+
+async def lifespan(app: FastAPI):
+    global loop_task
+    # Start the broadcast loop within the server's event loop
+    loop_task = asyncio.create_task(main_loop())
+    try:
+        yield
+    finally:
+        if loop_task is not None:
+            loop_task.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await loop_task
+            loop_task = None
+
+app = FastAPI(lifespan=lifespan)
 
 # CORS setup
 app.add_middleware(
@@ -139,24 +156,3 @@ async def main_loop():
     while True:
         await broadcast()
         await asyncio.sleep(1.0)
-
-loop_task: asyncio.Task | None = None
-
-
-@app.on_event("startup")
-async def start_background_tasks():
-    global loop_task
-    # Run the broadcast loop inside FastAPI/Uvicorn's event loop
-    loop_task = asyncio.create_task(main_loop())
-
-
-@app.on_event("shutdown")
-async def stop_background_tasks():
-    global loop_task
-    if loop_task is not None:
-        loop_task.cancel()
-        try:
-            await loop_task
-        except asyncio.CancelledError:
-            pass
-        loop_task = None
