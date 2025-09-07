@@ -84,7 +84,7 @@ async def lifespan(app: FastAPI):
                 await loop_task
             loop_task = None
 
-app = FastAPI(lifespan=lifespan)
+app = FastAPI(lifespan=lifespan) # type: ignore
 
 # CORS setup
 app.add_middleware(
@@ -109,6 +109,7 @@ def set_mode(body: ModeBody) -> dict:
 async def ws_telemetry(ws: WebSocket):
     await ws.accept()
     websocket_connections.append(ws)
+
 num = 0
 def get_state() -> dict:
     global msg_id, num, heartbeat_id, vfr, global_pos, heartbeat, batt, gps, attitude, msg_buffer
@@ -128,7 +129,8 @@ def get_state() -> dict:
             'speed': 12.0,
             'roll': 5.0,
             'pitch': -2.0,
-            'heartbeat': f"{num} hz",
+            'heartbeat': num,
+            'hb_hz': "1.50 hz",
             'status': "Status #0",
             }
 
