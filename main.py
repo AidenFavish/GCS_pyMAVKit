@@ -109,11 +109,12 @@ def set_mode(body: ModeBody) -> dict:
 async def ws_telemetry(ws: WebSocket):
     await ws.accept()
     websocket_connections.append(ws)
-
+num = 0
 def get_state() -> dict:
-    global msg_id, heartbeat_id, vfr, global_pos, heartbeat, batt, gps, attitude, msg_buffer
+    global msg_id, num, heartbeat_id, vfr, global_pos, heartbeat, batt, gps, attitude, msg_buffer
     msg_to_send = msg_buffer
     msg_buffer = ""
+    num+=1
     return {'timestamp': time.time() * 1000.0,
             'batterySoc': 92.0,
             'armed': False,
@@ -127,7 +128,7 @@ def get_state() -> dict:
             'speed': 12.0,
             'roll': 5.0,
             'pitch': -2.0,
-            'heartbeat': "1 hz",
+            'heartbeat': f"{num} hz",
             'status': "Status #0",
             }
 
