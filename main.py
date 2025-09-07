@@ -110,28 +110,26 @@ async def ws_telemetry(ws: WebSocket):
     await ws.accept()
     websocket_connections.append(ws)
 
-num = 0
 def get_state() -> dict:
-    global msg_id, num, heartbeat_id, vfr, global_pos, heartbeat, batt, gps, attitude, msg_buffer
+    global msg_id, heartbeat_id, vfr, global_pos, heartbeat, batt, gps, attitude, msg_buffer
     msg_to_send = msg_buffer
     msg_buffer = ""
-    num+=1
     return {'timestamp': time.time() * 1000.0,
-            'batterySoc': 92.0,
-            'armed': False,
+            'batterySoc': batt.soc,
+            'armed': heartbeat.isArmed(),
             'estopOn': True,
-            'mode': "RTL",
-            'currentLat': 37.7749,
-            'currentLon': -122.4194,
-            'heading': 45.0,
-            'altitude': 120.0,
-            'throttle': 30.0,
-            'speed': 12.0,
-            'roll': 5.0,
-            'pitch': -2.0,
-            'heartbeat': num,
-            'hb_hz': "1.50 hz",
-            'status': "Status #0",
+            'mode': heartbeat.mode.name,
+            'currentLat': global_pos.lat,
+            'currentLon': global_pos.lon,
+            'heading': global_pos.heading,
+            'altitude': global_pos.alt_relative,
+            'throttle': vfr.throttle,
+            'speed': (vfr.climbspeed**2+global_pos.vx**2+global_pos.vy**2)**0.5,
+            'roll': attitude.roll,
+            'pitch': attitude.pitch,
+            'heartbeat': heartbeat_id,
+            'hb_hz': f"{calculate_hz():.2f} hz",
+            'status': msg_to_send,
             }
 
 @app.get("/")
